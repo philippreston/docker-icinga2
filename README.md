@@ -27,11 +27,11 @@ and/or send a patch.
 Start a new container, bind the container's port 80 to localhost:3080
 and let the initialization do its job:
 
-    $ docker run -ti --name icinga2 -p 3080:80 icinga/icinga2
+    $ docker run -ti --name icinga2 -p 3080:80 ppreston/icinga2
 
 If you want to invoke it manually, go for
 
-    $ docker run -ti --name icinga2 -p 3080:80 icinga/icinga2 /bin/bash
+    $ docker run -ti --name icinga2 -p 3080:80 ppreston/icinga2 /bin/bash
     # /opt/icinga2/initdocker
 
 ### Exec
@@ -53,14 +53,14 @@ Attach to a running container using `exec` and the container name.
 Build a new container based on this repository:
 
     $ sudo docker pull centos:centos7
-    $ sudo docker build -t icinga/icinga2 .
+    $ sudo docker build -t ppreston/icinga2 .
 
 ### SSH Access
 
 Even if you can already mount specific [volumes](#volumes) there's ssh access
 available. Make sure to map the port accordingly.
 
-    $ sudo docker run -ti --name icinga2 -p 3080:80 -p 3022:22 icinga/icinga2
+    $ sudo docker run -ti --name icinga2 -p 3080:80 -p 3022:22 ppreston/icinga2
 
 Then login as `appuser/appuser`. sudo is enabled for this user.
 
@@ -84,7 +84,7 @@ the volume).
 The container already enables the Icinga 2 API listening on port `5665`. Export the
 port accordingly.
 
-    docker run -d -ti --name icinga2-api -p 4080:80 -p 4665:5665 icinga/icinga2
+    docker run -d -ti --name icinga2-api -p 4080:80 -p 4665:5665 ppreston/icinga2
 
 After the container is up and running, connect via HTTP to the exposed port using
 the credentials `root:icinga`.
@@ -108,7 +108,7 @@ running Graphite) you'll need to pass the environment variables to the container
 Furthermore you'll need to `--link` the container to an existing container, e.g. `graphite` to allow
 the link on port `2003` required by Graphite.
 
-    docker run -d -ti --name icinga2 -p 3080:80 --link graphite:graphite -e ICINGA2_FEATURE_GRAPHITE=1 -e ICINGA2_FEATURE_GRAPHITE_HOST="192.168.99.100" -e ICINGA2_FEATURE_GRAPHITE_PORT=2003 icinga/icinga2
+    docker run -d -ti --name icinga2 -p 3080:80 --link graphite:graphite -e ICINGA2_FEATURE_GRAPHITE=1 -e ICINGA2_FEATURE_GRAPHITE_HOST="192.168.99.100" -e ICINGA2_FEATURE_GRAPHITE_PORT=2003 ppreston/icinga2
 
 Example for a Graphite container called `graphite`:
 
