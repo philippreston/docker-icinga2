@@ -104,6 +104,12 @@ RUN mkdir -p /var/log/supervisor; \
  find /etc/icingaweb2 -type f -name "*.ini" -exec chmod 660 {} \; ; \
  find /etc/icingaweb2 -type d -exec chmod 2770 {} \;
 
+# Fix Nagios Plugins
+RUN chown -R root:root /usr/lib64/nagios/plugins/; \
+ chmod -R 775  /usr/lib64/nagios/plugins/ ; \ 
+ chmod u+s /usr/lib64/nagios/plugins/check_icmp ; \
+ chmod u+s /usr/lib64/nagios/plugins/check_dns ; 
+
 # configure PHP timezone
 RUN sed -i 's/;date.timezone =/date.timezone = UTC/g' /etc/php.ini
 
