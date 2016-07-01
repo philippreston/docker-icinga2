@@ -1,7 +1,6 @@
-# docker-icinga2
+# docker-icinga2 (on Postgres)
 
-This repository is used as source for the
-docker image `icinga/icinga2` located at [Docker Hub](https://registry.hub.docker.com/repos/icinga/).
+This repository is fork of official docker image for Icinga, but replaces Mysql with Postgres
 
 ## Requirements
 
@@ -17,7 +16,7 @@ and/or send a patch.
 ## Image details
 
 * Based on centos:centos7 (similar to the Vagrant boxes)
-* Icinga 2 w/ DB IDO MySQL, Icinga Web 2, MariaDB, Apache2
+* Icinga 2 w/ DB IDO Postgres, Icinga Web 2, Postgres, Apache2
 * Icinga 2 API
 * Default installation/credentials. Use at your own risk.
 
@@ -134,7 +133,7 @@ The following ports are exposed:
   22       | SSH
   80       | HTTP
   443      | HTTPS
-  3306     | MySQL
+  5432     | Postgres
   5665     | Icinga 2 API & Cluster
 
 ## Volumes
@@ -146,8 +145,6 @@ These volumes can be mounted in order to test and develop various stuff.
 
     /var/lib/icinga2
     /usr/share/icingaweb2
-
-    /var/lib/mysql
 
 # Thanks
 
