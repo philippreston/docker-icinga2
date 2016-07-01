@@ -1,3 +1,3 @@
 #!/bin/bash
 
-sudo docker build -t icinga/icinga2 .
+docker build -t philippreston/icinga2-pgsql .

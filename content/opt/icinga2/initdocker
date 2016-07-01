@@ -29,36 +29,95 @@ function echo_log {
 
 initfile=/opt/icinga2/init.done
 
-# update to latest snapshot packages
-echo_log "Fetching latest icinga* snapshot packages."
-{
-  yum update --enablerepo=icinga-snapshot-builds -y icinga2 icinga2-ido-mysql icingaweb2 icingacli
-  yum clean all
-} &> /dev/null
-
 echo_log "Validating the icinga2 configuration first."
 if ! icinga2 daemon -C; then
 	echo_log "Icinga 2 config validation failed. Stopping the container."
 	exit 1
 fi
 
+PGUSER=postgres
+PGENGINE=/usr/bin
+PGHOME=/var/lib/pgsql
+PGLOG=${PGHOME}/pglog.log
+PGDATA=${PGHOME}/data
+PGHBA=$PGDATA/pg_hba.conf
+PGPORT=5432
 
 if [ ! -f "${initfile}" ]; then
-        echo_log "Starting DB schema import. This might take a while (20sec+)."
-        mysql_install_db --user=mysql --ldata=/var/lib/mysql 2>&1 >/dev/null
-        /usr/bin/mysqld_safe 2>&1 >/dev/null &
+
+        # Change ownership of main directory
+        touch $PGLOG
+        chown -R $PGUSER:$PGUSER $PGHOME
+
+        # Initialize the database
+        echo_log "Initialising the Postgres Database"
+        initdbcmd="$PGENGINE/initdb --locale=$LANG --pgdata='$PGDATA' --auth='ident'"
+        su -l $PGUSER -c "$initdbcmd" >> "$PGLOG" 2>&1 < /dev/null
+
+        # Start / Stop Commands 
+        startdbcmd="$PGENGINE/pg_ctl -D $PGDATA -l $PGLOG start"
+        stopdbcmd="$PGENGINE/pg_ctl -D $PGDATA stop"
+
+        # Start the database
+        echo_log "Staring the Postgres Database"
+        su -l $PGUSER -c "$startdbcmd" >> "$PGLOG" 2>&1
         sleep 10s
-        mysql -uroot -e "CREATE DATABASE IF NOT EXISTS icinga ; GRANT ALL ON icinga.* TO icinga@localhost IDENTIFIED BY 'icinga';"
-        mysql -uicinga -picinga icinga < /usr/share/icinga2-ido-mysql/schema/mysql.sql
-        mysql -uroot -e "CREATE DATABASE IF NOT EXISTS icingaweb2 ; GRANT ALL ON icingaweb2.* TO icingaweb2@localhost IDENTIFIED BY 'icingaweb2';"
-        mysql -uicingaweb2 -picingaweb2 icingaweb2 < /usr/share/doc/icingaweb2/schema/mysql.schema.sql
-        mysql -uicingaweb2 -picingaweb2 icingaweb2 -e "INSERT INTO icingaweb_user (name, active, password_hash) VALUES ('icingaadmin', 1, '\$1\$iQSrnmO9\$T3NVTu0zBkfuim4lWNRmH.');"
-        killall mysqld
+
+        echo_log "Setting up icinga database"
+
+        # Create the icinga database
+        sudo -u $PGUSER psql -c "CREATE ROLE icinga WITH LOGIN PASSWORD 'icinga'" >> "$PGLOG" 2>&1
+        sudo -u $PGUSER createdb -O icinga -E UTF8 icinga >> "$PGLOG" 2>&1
+
+        # Setup access icinga 
+        echo "# default" > $PGHBA
+        echo "local   all      postgres                            peer" >> $PGHBA
+        echo "host    all      postgres      127.0.0.1/32          ident" >> $PGHBA
+        echo "host    all      postgres      ::1/128               ident" >> $PGHBA 
+
+        # Setup access icinga 
+        echo "# icinga" >> $PGHBA
+        echo "local   icinga      icinga                            md5" >> $PGHBA
+        echo "host    icinga      icinga      127.0.0.1/32          md5" >> $PGHBA
+        echo "host    icinga      icinga      ::1/128               md5" >> $PGHBA 
+
+        echo_log "Setting up icingaweb2 database"
+
+        # Create the icingaweb2 database
+        sudo -u $PGUSER psql -c "CREATE ROLE icingaweb2 WITH LOGIN PASSWORD 'icingaweb2'" >> "$PGLOG" 2>&1
+        sudo -u $PGUSER createdb -O icingaweb2 -E UTF8 icingaweb2 >> "$PGLOG" 2>&1
+
+        # Setup access icingaweb2 and restart 
+        echo "# icingaweb2" >> $PGHBA
+        echo "local   icingaweb2      icingaweb2                            md5" >> $PGHBA
+        echo "host    icingaweb2      icingaweb2      127.0.0.1/32          md5" >> $PGHBA
+        echo "host    icingaweb2      icingaweb2      ::1/128               md5" >> $PGHBA 
+        
+        # Restart
+        echo_log "Restarting Postgres"
+        su -l $PGUSER -c "$stopdbcmd" >> "$PGLOG" 2>&1
+        su -l $PGUSER -c "$startdbcmd" >> "$PGLOG" 2>&1
+        sleep 10s
+        
+        # Setup the schemas
+        echo_log "Importing the icinga schema"
+        schemacmd1="PGPASSWORD=icinga psql -U icinga -d icinga < /usr/share/icinga2-ido-pgsql/schema/pgsql.sql" 
+        su -l $PGUSER  -c "$schemacmd1"  >> "$PGLOG" 2>&1
+
+        echo_log "Importing the icingaweb2 schema"
+        schemacmd2="PGPASSWORD=icingaweb2 psql -U icingaweb2 -d icingaweb2 </usr/share/doc/icingaweb2/schema/pgsql.schema.sql" 
+        su -l $PGUSER  -c "$schemacmd2"  >> "$PGLOG" 2>&1
+
+        echo_log "Adding default user for web"
+        PW='\$1\$1AvZsnnH\$4xl9N2vQ.3.A0fOJRk8Jo.'
+        insertusercmd="PGPASSWORD=icingaweb2 psql -U icingaweb2 -d icingaweb2 -c \"INSERT INTO icingaweb_user (name, active, password_hash) VALUES ('icingaadmin', 1, '$PW');\""
+        su -l $PGUSER -c "$insertusercmd"  >> "$PGLOG" 2>&1  
+
         sleep 1s
 
         echo_log "Enabling icinga2 features."
         # enable icinga2 features if not already there
-        icinga2 feature enable ido-mysql command
+        icinga2 feature enable ido-pgsql command
 
         echo_log "Enabling icingaweb2 modules."
         if [[ -L /etc/icingaweb2/enabledModules/monitoring ]]; then echo "Symlink for /etc/icingaweb2/enabledModules/monitoring exists already...skipping"; else ln -s /usr/share/icingaweb2/modules/monitoring /etc/icingaweb2/enabledModules/monitoring; fi

@@ -25,8 +25,12 @@ MAINTAINER Icinga Development Team
 # for systemd
 ENV container docker
 
+# make the "en_US.UTF-8" locale so postgres will be utf-8 enabled by default
 RUN yum -y update; yum clean all; \
- yum -y install epel-release; yum clean all; \
+    localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+ENV LANG en_US.utf8
+
+RUN yum -y install epel-release; yum clean all; \
  yum -y install http://packages.icinga.org/epel/7/release/noarch/icinga-rpm-release-7-1.el7.centos.noarch.rpm; yum clean all
 
 # docs are not installed by default https://github.com/docker/docker/issues/10650 https://registry.hub.docker.com/_/centos/
@@ -36,9 +40,10 @@ RUN [ -f /etc/rpm/macros.imgcreate ] && sed -i '/excludedocs/d' /etc/rpm/macros.
 RUN [ -f /etc/yum.conf ] && sed -i '/nodocs/d' /etc/yum.conf || exit 0
 
 RUN yum -y install vim hostname bind-utils cronie logrotate supervisor openssh openssh-server openssh-client rsyslog sudo passwd sed which vim-enhanced pwgen psmisc mailx \
- httpd nagios-plugins-all mariadb-server mariadb-libs mariadb; \
- yum -y install --enablerepo=icinga-snapshot-builds icinga2 icinga2-doc icinga2-ido-mysql icingaweb2 icingacli php-ZendFramework php-ZendFramework-Db-Adapter-Pdo-Mysql; \
+ httpd nagios-plugins-all yum install postgresql-server postgresql; \
+ yum -y install --enablerepo=icinga-snapshot-builds icinga2 icinga2-doc icinga2-ido-pgsql icingaweb2 icingacli php-ZendFramework php-ZendFramework-Db-Adapter-Pdo-Pgsql; \
  yum clean all;
+
 
 # create api certificates and users (will be overridden later)
 RUN icinga2 api setup
@@ -102,11 +107,11 @@ RUN mkdir -p /var/log/supervisor; \
 # configure PHP timezone
 RUN sed -i 's/;date.timezone =/date.timezone = UTC/g' /etc/php.ini
 
-# ports (icinga2 api & cluster (5665), mysql (3306))
-EXPOSE 22 80 443 5665 3306
+# ports (icinga2 api & cluster (5665), postgres (5432))
+EXPOSE 22 80 443 5665 5432
 
 # volumes
-VOLUME ["/etc/icinga2", "/etc/icingaweb2", "/var/lib/icinga2", "/usr/share/icingaweb2", "/var/lib/mysql"]
+VOLUME ["/etc/icinga2", "/etc/icingaweb2", "/var/lib/icinga2", "/usr/share/icingaweb2"]
 
 # change this to entrypoint preventing bash login
 CMD ["/opt/icinga2/initdocker"]
