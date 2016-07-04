@@ -110,6 +110,8 @@ RUN chown -R root:root /usr/lib64/nagios/plugins/; \
  chmod u+s /usr/lib64/nagios/plugins/check_icmp ; \
  chmod u+s /usr/lib64/nagios/plugins/check_dns ; 
 
+ENV MIBDIRS=/etc/icinga2/mibs/:/usr/share/snmp/mibs
+
 # configure PHP timezone
 RUN sed -i 's/;date.timezone =/date.timezone = UTC/g' /etc/php.ini
 
